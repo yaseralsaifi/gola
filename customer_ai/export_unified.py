@@ -15,9 +15,9 @@ def compute_delta_table(base_df: pd.DataFrame, cols: dict, config: dict) -> pd.D
     if col_avgq not in base_df.columns or col_high not in base_df.columns:
         return pd.DataFrame()
 
-    avg_series  = to_numeric(base_df[col_avgq].map(clean_number))
+    avg_series = to_numeric(base_df[col_avgq].map(clean_number))
     high_series = to_numeric(base_df[col_high].map(clean_number))
-    decimals_pct = config["delta"]["decimals_pct"]
+    decimals_pct = int(config["delta"]["decimals_pct"])
 
     d = pd.DataFrame(index=base_df.index)
 
@@ -31,19 +31,27 @@ def compute_delta_table(base_df: pd.DataFrame, cols: dict, config: dict) -> pd.D
     d["[فارق] فارق التغير (نسبي)"] = delta_ratio
     d["[فارق] فئة نسبة الفارق %"] = (pd.Series(delta_ratio, index=base_df.index).abs() * 100.0).round(decimals_pct)
 
+    # ✅ اتجاه مبسط (حسب طلبك: >0 ارتفاع، <0 انخفاض)
     def _dir(x):
-        if pd.isna(x): return "—"
-        if x < 0: return "ارتفاع"
-        if x > 0: return "انخفاض"
+        if pd.isna(x):
+            return "—"
+        if x > 0:
+            return "ارتفاع"
+        if x < 0:
+            return "انخفاض"
         return "مستقر"
 
     d["[فارق] اتجاه مبسط"] = pd.Series(delta_ratio, index=base_df.index).apply(_dir)
 
     def _mag(pct):
-        if pd.isna(pct): return "—"
-        if pct < 10: return "خفيف"
-        elif pct < 30: return "متوسط"
-        else: return "قوي"
+        if pd.isna(pct):
+            return "—"
+        if pct < 10:
+            return "خفيف"
+        elif pct < 30:
+            return "متوسط"
+        else:
+            return "قوي"
 
     d["[فارق] شدة الفارق"] = d["[فارق] فئة نسبة الفارق %"].apply(_mag)
 
@@ -53,9 +61,9 @@ def compute_delta_table(base_df: pd.DataFrame, cols: dict, config: dict) -> pd.D
 def compute_returns_table(base_df: pd.DataFrame, cols: dict, config: dict) -> pd.DataFrame:
     # نفس منطقك في التصدير الموحد (Hardcoded) كما كان
     col_avgpay = cols["avgq"]
-    col_base   = "نسبة المرتجع من المباع"
-    col_new    = "نسبة نوع جديد من مرتجعات العميل"
-    col_comp   = "نسبة نوع تعويض من مرتجعات العميل"
+    col_base = "نسبة المرتجع من المباع"
+    col_new = "نسبة نوع جديد من مرتجعات العميل"
+    col_comp = "نسبة نوع تعويض من مرتجعات العميل"
 
     m_ok = config["returns"]["m_ok"]
     m_watch = config["returns"]["m_watch"]
@@ -130,10 +138,10 @@ def compute_rep_turnover_map(base_df: pd.DataFrame) -> pd.DataFrame:
     يحتوي على مفاتيح الربط + العمودين المطلوب تكرارهما أمام كل عميل.
     """
     REP_NAME_COL = "اسم المندوب"
-    REP_ID_COL   = "رقم المندوب"
-    DEBT_COL     = "المديونية"
-    AVGQ_COL     = "متوسط السداد الربعي"
-    MONTHLY_COL  = "السداد الشهري للعميل"
+    REP_ID_COL = "رقم المندوب"
+    DEBT_COL = "المديونية"
+    AVGQ_COL = "متوسط السداد الربعي"
+    MONTHLY_COL = "السداد الشهري للعميل"
 
     required = [REP_NAME_COL, REP_ID_COL, DEBT_COL, AVGQ_COL, MONTHLY_COL]
     if any(c not in base_df.columns for c in required):
@@ -193,7 +201,6 @@ def render_unified_export(df, df_original, cols, config):
 
         # ====== إضافة دوران المندوب لكل عميل (تكرار على الصفوف) ======
         if rep_turn is not None and not rep_turn.empty:
-            # ربط على رقم + اسم لضمان الدقة
             if ("رقم المندوب" in unified.columns) and ("اسم المندوب" in unified.columns):
                 unified = unified.merge(
                     rep_turn,
@@ -201,7 +208,6 @@ def render_unified_export(df, df_original, cols, config):
                     on=["رقم المندوب", "اسم المندوب"]
                 )
             else:
-                # لو الأعمدة غير موجودة في الملف الأصلي لأي سبب
                 unified["الدوران الربعي للمندوب"] = np.nan
                 unified["الدوران الشهري للمندوب"] = np.nan
         else:
@@ -219,5 +225,6 @@ def render_unified_export(df, df_original, cols, config):
         st.download_button(
             "⬇️ تحميل الملف الموحّد (Excel)",
             buf,
-            file_name="نتائج_موحّدة_كل_التبويبات.xlsx"
+            file_name="نتائج_موحّدة_كل_التبويبات.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )

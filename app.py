@@ -1,57 +1,63 @@
-# 🧠 مشروع تحليل السمات مقابل الهدف - نسخة متوافقة مع Render وملفات Excel مرنة
+# -*- coding: utf-8 -*-
 import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
 
-st.set_page_config(page_title="تحليل السمات والهدف", layout="wide")
-st.title("🧪 تحليل العلاقة بين السمات والهدف")
+from customer_ai.utils import normalize
+from customer_ai.columns import read_uploaded_file, detect_columns, sidebar_column_mapping
+from customer_ai.scoring import build_config_from_sidebar
+from customer_ai.main_tab import render_main_tab
+from customer_ai.delta_tab import render_delta_tab
+from customer_ai.returns_tab import render_returns_tab
+from customer_ai.diag_tab import render_diag_tab
+from customer_ai.export_unified import render_unified_export
 
-uploaded_file = st.file_uploader("📥 ارفع ملف Excel يحتوي على البيانات", type=["xlsx"])
+st.set_page_config(page_title="المساعد الذكي لتصنيف العملاء - v5.6.5", layout="wide")
+st.title("المساعد الذكي لتصنيف العملاء وتحليل المديونية — v5.6.5")
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-    st.success("✅ تم تحميل البيانات بنجاح")
-    st.subheader("🔍 نظرة عامة على البيانات")
-    st.write(df.head())
+st.sidebar.header("📂 ملف البيانات")
+uploaded_file = st.sidebar.file_uploader("ارفع ملف Excel أو CSV", type=["xlsx", "csv"])
 
-    # عرض الأعمدة الموجودة فعليًا
-    st.write("🧾 الأعمدة المتوفرة:", df.columns.tolist())
+st.sidebar.header("⚙️ الإعدادات الأساسية")
+config = build_config_from_sidebar()
 
-    # محاولة العثور على العمود "سدد" تلقائيًا
-    target_column = None
-    for col in df.columns:
-        if str(col).strip() == "سدد":
-            target_column = col
-            break
+if not uploaded_file:
+    st.info("⬆️ ارفع ملف العملاء للبدء (Excel/CSV).")
+    st.stop()
 
-    if target_column:
-        X = df.drop(target_column, axis=1)
-        y = df[target_column]
+df = read_uploaded_file(uploaded_file)
+df.columns = [normalize(c) for c in df.columns]
+df_original = df.copy()
 
-        st.subheader("📊 تحليل سمة مقابل الهدف")
-        selected_feature = st.selectbox("اختر سمة لعرض العلاقة", X.columns)
-        fig, ax = plt.subplots()
-        sns.boxplot(x=y, y=X[selected_feature], ax=ax)
-        ax.set_xlabel("سدد (0=لا، 1=نعم)")
-        ax.set_ylabel(selected_feature)
-        st.pyplot(fig)
+detected = detect_columns(df)
+cols = sidebar_column_mapping(df, detected)
 
-        st.subheader("🤖 تدريب نموذج سريع")
-        test_size = st.slider("نسبة بيانات الاختبار", 0.1, 0.5, 0.3)
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+st.sidebar.caption(
+    f"Detected ➜ المديونية: {detected['debt'] or '—'} | المتوسط: {detected['avgq'] or '—'} | "
+    f"العمر: {detected['age'] or '—'} | أعلى متوسط: {detected['high'] or '—'}"
+)
 
-        model = RandomForestClassifier()
-        model.fit(X_train, y_train)
-        y_pred = model.predict(X_test)
+st.info(
+    "سيتم استخدام الأعمدة: المديونية = **{}** ، متوسط السداد = **{}**{}".format(
+        cols["debt"], cols["avgq"], f" ، العمر = **{cols['age']}**" if cols["age"] else ""
+    )
+)
 
-        st.write("✅ دقة النموذج:", accuracy_score(y_test, y_pred))
-        st.text("📋 تقرير التصنيف:")
-        st.text(classification_report(y_test, y_pred))
-    else:
-        st.error("❌ العمود 'سدد' غير موجود في البيانات. تأكد من كتابته بدون مسافات أو رموز.")
-else:
-    st.warning("📂 الرجاء رفع ملف Excel للبدء")
+tab_main, tab_delta, tab_returns, tab_diag = st.tabs([
+    "🔎 التصنيف والتحليل الأساسي",
+    "🔁 أعمدة الفارق المبسطة",
+    "📊 تصنيفات المرتجع (مستقل)",
+    "🛠️ تشخيص سريع"
+])
+
+with tab_main:
+    render_main_tab(df, df_original, cols, config)
+
+with tab_delta:
+    render_delta_tab(df, cols, config)
+
+with tab_returns:
+    render_returns_tab(df, cols, config)
+
+with tab_diag:
+    render_diag_tab(df, cols, config)
+
+render_unified_export(df, df_original, cols, config)

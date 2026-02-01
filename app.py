@@ -8,17 +8,20 @@ from customer_ai.main_tab import render_main_tab
 from customer_ai.delta_tab import render_delta_tab
 from customer_ai.returns_tab import render_returns_tab
 from customer_ai.diag_tab import render_diag_tab
+from customer_ai.rep_turnover_tab import render_rep_turnover_tab
 from customer_ai.export_unified import render_unified_export
 
 st.set_page_config(page_title="المساعد الذكي لتصنيف العملاء - v5.6.5", layout="wide")
 st.title("المساعد الذكي لتصنيف العملاء وتحليل المديونية — v5.6.5")
 
+# ======================== الشريط الجانبي ========================
 st.sidebar.header("📂 ملف البيانات")
 uploaded_file = st.sidebar.file_uploader("ارفع ملف Excel أو CSV", type=["xlsx", "csv"])
 
 st.sidebar.header("⚙️ الإعدادات الأساسية")
 config = build_config_from_sidebar()
 
+# ======================== قراءة الملف ========================
 if not uploaded_file:
     st.info("⬆️ ارفع ملف العملاء للبدء (Excel/CSV).")
     st.stop()
@@ -27,6 +30,7 @@ df = read_uploaded_file(uploaded_file)
 df.columns = [normalize(c) for c in df.columns]
 df_original = df.copy()
 
+# ======================== اكتشاف/اختيار الأعمدة ========================
 detected = detect_columns(df)
 cols = sidebar_column_mapping(df, detected)
 
@@ -41,11 +45,13 @@ st.info(
     )
 )
 
-tab_main, tab_delta, tab_returns, tab_diag = st.tabs([
+# ======================== تبويبات الواجهة ========================
+tab_main, tab_delta, tab_returns, tab_diag, tab_rep = st.tabs([
     "🔎 التصنيف والتحليل الأساسي",
     "🔁 أعمدة الفارق المبسطة",
     "📊 تصنيفات المرتجع (مستقل)",
-    "🛠️ تشخيص سريع"
+    "🛠️ تشخيص سريع",
+    "👥 دوران المديونية للمندوبين"
 ])
 
 with tab_main:
@@ -60,4 +66,8 @@ with tab_returns:
 with tab_diag:
     render_diag_tab(df, cols, config)
 
+with tab_rep:
+    render_rep_turnover_tab(df_original, cols, config)  # نستخدم الأصل لثبات الأعمدة
+
+# ======================== تصدير ملف موحّد ========================
 render_unified_export(df, df_original, cols, config)

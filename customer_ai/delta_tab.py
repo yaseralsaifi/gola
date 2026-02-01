@@ -5,6 +5,7 @@ from io import BytesIO
 
 from .utils import to_numeric, clean_number
 
+
 def render_delta_tab(df, cols, config):
     st.subheader("🔁 أعمدة الفارق المبسطة (بالمعادلة الجديدة)")
 
@@ -20,7 +21,7 @@ def render_delta_tab(df, cols, config):
         st.info("للحساب هنا يلزم وجود الأعمدة المختارة في الملف.")
         return
 
-    avg_series  = to_numeric(df[col_avgq].map(clean_number))
+    avg_series = to_numeric(df[col_avgq].map(clean_number))
     high_series = to_numeric(df[col_high].map(clean_number))
 
     df_delta = df.copy()
@@ -35,15 +36,15 @@ def render_delta_tab(df, cols, config):
     # حجم الفارق كنسبة مئوية
     df_delta["فئة نسبة الفارق %"] = (
         df_delta["فارق التغير (نسبي)"].abs() * 100
-    ).round(decimals_pct)
+    ).round(int(decimals_pct))
 
-    # اتجاه مبسط
+    # اتجاه مبسط (حسب طلبك: أكبر من الصفر = ارتفاع، أقل من الصفر = انخفاض)
     def simple_dir(x):
         if pd.isna(x):
             return "—"
-        if x < 0:
-            return "ارتفاع"
         if x > 0:
+            return "ارتفاع"
+        if x < 0:
             return "انخفاض"
         return "مستقر"
 
@@ -79,8 +80,10 @@ def render_delta_tab(df, cols, config):
     out_delta = BytesIO()
     df_delta.to_excel(out_delta, index=False)
     out_delta.seek(0)
+
     st.download_button(
         "⬇️ تحميل ملف الفارق (Excel)",
         out_delta,
         file_name="نتائج_أعمدة_الفارق.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
